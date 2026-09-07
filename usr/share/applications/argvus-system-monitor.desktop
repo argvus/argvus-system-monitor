@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=ARGVUS System Monitor
+Name[pt_BR]=Monitor do Sistema ARGVUS
+GenericName=System Monitor
+GenericName[pt_BR]=Monitor do sistema
+Comment=btop system monitor configured for ARGVUS
+Comment[pt_BR]=Monitor do sistema btop configurado para o ARGVUS
+Icon=utilities-system-monitor
+Exec=argvus-terminal --class argvus-system-monitor -e argvus-system-monitor
+Terminal=false
+Categories=System;Monitor;ConsoleOnly;
+Keywords=system;monitor;btop;argvus;
+StartupNotify=false
