@@ -20,8 +20,20 @@ usage() {
   cat <<'USAGE'
 Usage:
   argvus-system-monitor [btop options]
+  argvus-system-monitor --mem [btop options]
+  argvus-system-monitor --cpu [btop options]
+  argvus-system-monitor --net [btop options]
+  argvus-system-monitor --proc [btop options]
   argvus-system-monitor --print-config
   argvus-system-monitor --print-theme
+
+Module shortcuts:
+  --mem   Show only memory/disks
+  --cpu   Show only CPU
+  --net   Show only network
+  --proc  Show only processes
+
+With no module shortcut, all standard boxes are shown.
 
 The active theme is read from:
   ~/.config/argvus/.active-theme
@@ -35,7 +47,6 @@ die() {
 
 read_active_theme() {
   if [ -r "$ACTIVE_THEME_FILE" ]; then
-    # Read only the first line and strip CR/leading/trailing whitespace.
     _theme="$(sed -n '1{s/\r$//;s/^[[:space:]]*//;s/[[:space:]]*$//;p;}' "$ACTIVE_THEME_FILE")"
   else
     _theme=""
@@ -54,63 +65,97 @@ read_active_theme() {
 
 build_runtime_config() {
   _theme="$1"
+  _shown_boxes="$2"
 
   [ -f "$BTOP_CONFIG" ] || die "btop config not found: $BTOP_CONFIG"
   [ -d "$BTOP_THEMES_DIR" ] || die "btop themes directory not found: $BTOP_THEMES_DIR"
 
   mkdir -p "$RUNTIME_DIR"
 
-  # Keep the packaged btop configuration intact and change only color_theme.
-  # btop resolves this theme name through --themes-dir below.
-  if grep -q '^[[:space:]]*color_theme[[:space:]]*=' "$BTOP_CONFIG"; then
-    sed "s|^[[:space:]]*color_theme[[:space:]]*=.*|color_theme = \"${_theme}\"|" \
-      "$BTOP_CONFIG" > "$RUNTIME_CONFIG"
-  else
-    {
-      printf 'color_theme = "%s"\n' "$_theme"
-      cat "$BTOP_CONFIG"
-    } > "$RUNTIME_CONFIG"
+  sed \
+    -e "s|^[[:space:]]*color_theme[[:space:]]*=.*|color_theme = \"${_theme}\"|" \
+    -e "s|^[[:space:]]*shown_boxes[[:space:]]*=.*|shown_boxes = \"${_shown_boxes}\"|" \
+    "$BTOP_CONFIG" > "$RUNTIME_CONFIG"
+
+  if ! grep -q '^[[:space:]]*color_theme[[:space:]]*=' "$RUNTIME_CONFIG"; then
+    printf '\ncolor_theme = "%s"\n' "$_theme" >> "$RUNTIME_CONFIG"
+  fi
+
+  if ! grep -q '^[[:space:]]*shown_boxes[[:space:]]*=' "$RUNTIME_CONFIG"; then
+    printf 'shown_boxes = "%s"\n' "$_shown_boxes" >> "$RUNTIME_CONFIG"
   fi
 }
 
 has_explicit_btop_paths() {
   for _arg in "$@"; do
     case "$_arg" in
-      -c|--config|--config=*|--themes-dir|--themes-dir=*) return 0 ;;
+      -c|--config|--config=*|--themes-dir|--themes-dir=*)
+        return 0
+        ;;
     esac
   done
+
   return 1
 }
+
+SHOWN_BOXES="cpu mem net proc"
 
 case "${1:-}" in
   -h|--help)
     usage
     exit 0
     ;;
+
+  --mem)
+    SHOWN_BOXES="mem"
+    shift
+    ;;
+
+  --cpu)
+    SHOWN_BOXES="cpu"
+    shift
+    ;;
+
+  --net)
+    SHOWN_BOXES="net"
+    shift
+    ;;
+
+  --proc)
+    SHOWN_BOXES="proc"
+    shift
+    ;;
+
   --print-theme)
     read_active_theme
     exit 0
     ;;
+
   --print-config)
     _theme="$(read_active_theme)"
-    build_runtime_config "$_theme"
+    build_runtime_config "$_theme" "$SHOWN_BOXES"
     printf '%s\n' "$RUNTIME_CONFIG"
     exit 0
     ;;
 esac
 
+# Always launch the graphical/system-monitor invocation inside Foot.
+#
+# ARGVUS_SYSTEM_MONITOR_IN_FOOT prevents an infinite loop:
+#
+# argvus-system-monitor
+#   -> foot argvus-system-monitor
+#       -> btop
+#
 # Respect explicit btop paths supplied by the user.
 if has_explicit_btop_paths "$@"; then
   exec btop "$@"
 fi
 
-# Generate a runtime config whose color_theme matches
-# ~/.config/argvus/.active-theme, then replace this wrapper with btop itself.
-#
-# Keep btop in the foreground. Starting it with `&` from this non-interactive
-# wrapper can detach stdin from the controlling terminal, which makes btop
-# abort with: "ERROR: No tty detected!".
 ACTIVE_THEME="$(read_active_theme)"
-build_runtime_config "$ACTIVE_THEME"
+build_runtime_config "$ACTIVE_THEME" "$SHOWN_BOXES"
 
-exec btop --config "$RUNTIME_CONFIG" --themes-dir "$BTOP_THEMES_DIR" "$@"
+btop \
+--config "$RUNTIME_CONFIG" \
+--themes-dir "$BTOP_THEMES_DIR" \
+"$@"
