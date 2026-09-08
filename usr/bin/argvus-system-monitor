@@ -1,34 +1,31 @@
 #!/usr/bin/env sh
-# Launch the official btop system monitor with ARGVUS runtime configuration.
+# Launch btop with the ARGVUS configuration and currently active ARGVUS theme.
 
 set -eu
 
-SYSTEM_ROOT="${ARGVUS_SYSTEM_MONITOR_CONFIG:-/usr/share/argvus-system-monitor}"
-DEFAULT_THEME="argvus-dark-aether"
-DEFAULT_ACCENT="#3590bd"
+: "${HOME:?HOME is not set}"
 
-ARGVUS_BOOTSTRAP="${ARGVUS_BOOTSTRAP:-${ARGVUS_SYSTEM_CONFIG:-/usr/share/argvus}/scripts/argvus/bootstrap.sh}"
-if [ -r "$ARGVUS_BOOTSTRAP" ]; then
-  # shellcheck disable=SC1090,SC1091
-  . "$ARGVUS_BOOTSTRAP"
-else
-  : "${HOME:?HOME is not set}"
-  ARGVUS_CONFIG_HOME="${ARGVUS_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}}"
-  ARGVUS_CACHE_HOME="${ARGVUS_CACHE_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/argvus}"
-  paths_cache() { printf '%s\n' "${ARGVUS_CACHE_HOME}/${1}"; }
-fi
+SYSTEM_ROOT="${ARGVUS_SYSTEM_MONITOR_CONFIG:-/usr/share/argvus-system-monitor}"
+CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+ARGVUS_DIR="${ARGVUS_CONFIG_DIR:-$HOME/.config/argvus}"
+ACTIVE_THEME_FILE="${ARGVUS_ACTIVE_THEME_FILE:-$ARGVUS_DIR/.active-theme}"
+DEFAULT_THEME="argvus-dark-aether"
+
+BTOP_CONFIG="${SYSTEM_ROOT}/btop/btop.conf"
+BTOP_THEMES_DIR="${SYSTEM_ROOT}/btop/themes"
+RUNTIME_DIR="${CACHE_HOME}/argvus/argvus-system-monitor"
+RUNTIME_CONFIG="${RUNTIME_DIR}/btop.conf"
 
 usage() {
-  cat <<'EOF'
+  cat <<'USAGE'
 Usage:
   argvus-system-monitor [btop options]
-  argvus-system-monitor --apply [theme]
-  argvus-system-monitor --print-config [theme]
+  argvus-system-monitor --print-config
+  argvus-system-monitor --print-theme
 
-Options:
-  -c, --config <file>          Use btop directly with an explicit config.
-  --themes-dir <directory>     Use btop directly with an explicit themes dir.
-EOF
+The active theme is read from:
+  ~/.config/argvus/.active-theme
+USAGE
 }
 
 die() {
@@ -36,127 +33,84 @@ die() {
   exit 1
 }
 
-read_first_line() {
-  _file="$1"
-  _fallback="$2"
-  if [ -s "$_file" ]; then
-    sed -n '1p' "$_file"
+read_active_theme() {
+  if [ -r "$ACTIVE_THEME_FILE" ]; then
+    # Read only the first line and strip CR/leading/trailing whitespace.
+    _theme="$(sed -n '1{s/\r$//;s/^[[:space:]]*//;s/[[:space:]]*$//;p;}' "$ACTIVE_THEME_FILE")"
   else
-    printf '%s\n' "$_fallback"
+    _theme=""
+  fi
+
+  [ -n "$_theme" ] || _theme="$DEFAULT_THEME"
+
+  if [ ! -f "$BTOP_THEMES_DIR/${_theme}.theme" ]; then
+    printf 'argvus-system-monitor: theme "%s" from %s was not found; using "%s"\n' \
+      "$_theme" "$ACTIVE_THEME_FILE" "$DEFAULT_THEME" >&2
+    _theme="$DEFAULT_THEME"
+  fi
+
+  printf '%s\n' "$_theme"
+}
+
+build_runtime_config() {
+  _theme="$1"
+
+  [ -f "$BTOP_CONFIG" ] || die "btop config not found: $BTOP_CONFIG"
+  [ -d "$BTOP_THEMES_DIR" ] || die "btop themes directory not found: $BTOP_THEMES_DIR"
+
+  mkdir -p "$RUNTIME_DIR"
+
+  # Keep the packaged btop configuration intact and change only color_theme.
+  # btop resolves this theme name through --themes-dir below.
+  if grep -q '^[[:space:]]*color_theme[[:space:]]*=' "$BTOP_CONFIG"; then
+    sed "s|^[[:space:]]*color_theme[[:space:]]*=.*|color_theme = \"${_theme}\"|" \
+      "$BTOP_CONFIG" > "$RUNTIME_CONFIG"
+  else
+    {
+      printf 'color_theme = "%s"\n' "$_theme"
+      cat "$BTOP_CONFIG"
+    } > "$RUNTIME_CONFIG"
   fi
 }
 
-read_active_theme() {
-  read_first_line "${ARGVUS_CONFIG_HOME}/argvus/.active-theme" "$DEFAULT_THEME"
-}
-
-theme_default_accent() {
-  case "$1" in
-    argvus-dark-aether|argvus-dark-aether-float) printf '#3590bd\n' ;;
-    argvus-dark-silver|argvus-dark-silver-float) printf '#595959\n' ;;
-    argvus-light-veil|argvus-light-veil-float) printf '#181818\n' ;;
-    argvus-dark-slate|argvus-dark-slate-float) printf '#7391a5\n' ;;
-    argvus-dark-universe|argvus-dark-universe-float) printf '#eeeeee\n' ;;
-    *) printf '%s\n' "$DEFAULT_ACCENT" ;;
-  esac
-}
-
-read_accent() {
-  _theme="$1"
-  _fallback="$(theme_default_accent "$_theme")"
-  read_first_line "${ARGVUS_CONFIG_HOME}/argvus/.accent-color" "$_fallback"
-}
-
-theme_source_file() {
-  _theme="$1"
-  for _file in \
-    "${ARGVUS_CONFIG_HOME}/argvus/system-monitor/btop/themes/${_theme}/theme.theme" \
-    "${SYSTEM_ROOT}/btop/themes/${_theme}/theme.theme"; do
-    [ -f "$_file" ] && { printf '%s\n' "$_file"; return 0; }
-  done
-  printf '%s\n' "${SYSTEM_ROOT}/btop/themes/${DEFAULT_THEME}/theme.theme"
-}
-
-runtime_theme() {
-  _theme="${1:-$(read_active_theme)}"
-  _src="$(theme_source_file "$_theme")"
-  _accent="$(read_accent "$_theme")"
-  _dst="$(paths_cache "argvus-system-monitor/themes/${_theme}/theme.theme")"
-
-  mkdir -p "${_dst%/*}"
-  cp "$_src" "$_dst"
-  for _key in title hi_fg proc_misc cpu_box mem_box net_box proc_box temp_start; do
-    sed -i "s|^theme\\[${_key}\\]=.*|theme[${_key}]=\"${_accent}\"|" "$_dst"
-  done
-  printf '%s\n' "$_dst"
-}
-
-base_config() {
-  for _file in \
-    "${ARGVUS_CONFIG_HOME}/argvus/system-monitor/btop/btop.conf" \
-    "${SYSTEM_ROOT}/btop/btop.conf"; do
-    [ -f "$_file" ] && { printf '%s\n' "$_file"; return 0; }
-  done
-  die "btop config not found under ${SYSTEM_ROOT}/btop"
-}
-
-runtime_config() {
-  _theme="${1:-$(read_active_theme)}"
-  _src="$(base_config)"
-  _theme_file="$(runtime_theme "$_theme")"
-  _dst="$(paths_cache argvus-system-monitor/btop.conf)"
-
-  mkdir -p "${_dst%/*}"
-  sed "s|^[[:space:]]*color_theme[[:space:]]*=.*|color_theme = \"${_theme_file}\"|" "$_src" > "$_dst"
-  printf '%s\n' "$_dst"
-}
-
-has_arg() {
-  _patterns="$1"
-  shift
-  for _arg do
-    for _pattern in $_patterns; do
-      # shellcheck disable=SC2254
-      case "$_arg" in
-        $_pattern) return 0 ;;
-      esac
-    done
+has_explicit_btop_paths() {
+  for _arg in "$@"; do
+    case "$_arg" in
+      -c|--config|--config=*|--themes-dir|--themes-dir=*) return 0 ;;
+    esac
   done
   return 1
 }
 
-mode="launch"
-theme=""
-
 case "${1:-}" in
-  --help|-h)
+  -h|--help)
     usage
     exit 0
     ;;
-  --apply)
-    mode="apply"
-    shift
-    theme="${1:-}"
+  --print-theme)
+    read_active_theme
+    exit 0
     ;;
   --print-config)
-    mode="print-config"
-    shift
-    theme="${1:-}"
+    _theme="$(read_active_theme)"
+    build_runtime_config "$_theme"
+    printf '%s\n' "$RUNTIME_CONFIG"
+    exit 0
     ;;
 esac
 
-if [ "$mode" = "apply" ]; then
-  runtime_config "${theme:-$(read_active_theme)}" >/dev/null
-  exit 0
-fi
-
-if [ "$mode" = "print-config" ]; then
-  runtime_config "${theme:-$(read_active_theme)}"
-  exit 0
-fi
-
-if has_arg '-c --config --config=* --themes-dir --themes-dir=*' "$@"; then
+# Respect explicit btop paths supplied by the user.
+if has_explicit_btop_paths "$@"; then
   exec btop "$@"
 fi
 
-exec btop --config "$(runtime_config "$(read_active_theme)")" --themes-dir "${SYSTEM_ROOT}/btop/themes" "$@"
+# Generate a runtime config whose color_theme matches
+# ~/.config/argvus/.active-theme, then replace this wrapper with btop itself.
+#
+# Keep btop in the foreground. Starting it with `&` from this non-interactive
+# wrapper can detach stdin from the controlling terminal, which makes btop
+# abort with: "ERROR: No tty detected!".
+ACTIVE_THEME="$(read_active_theme)"
+build_runtime_config "$ACTIVE_THEME"
+
+exec btop --config "$RUNTIME_CONFIG" --themes-dir "$BTOP_THEMES_DIR" "$@"

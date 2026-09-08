@@ -35,7 +35,7 @@ validate:
 	test -x usr/bin/argvus-system-monitor; \
 	test -f usr/share/applications/argvus-system-monitor.desktop; \
 	test -f usr/share/argvus-system-monitor/btop/btop.conf; \
-	for theme in usr/share/argvus-system-monitor/btop/themes/*/theme.theme; do test -f "$$theme"; done; \
+	for theme in usr/share/argvus-system-monitor/btop/themes/*.theme; do test -f "$$theme"; done; \
 	sh -n usr/bin/argvus-system-monitor; \
 	if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck -e SC1090 -e SC1091 usr/bin/argvus-system-monitor; \
