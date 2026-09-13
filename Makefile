@@ -15,12 +15,12 @@ help:
 	@echo "  make validate"
 
 install:
-	$(INSTALL) -Dm755 usr/bin/argvus-system-monitor \
+	$(INSTALL) -Dm755 src/usr/bin/argvus-system-monitor \
 		"$(DESTDIR)$(PREFIX)/bin/argvus-system-monitor"
-	$(INSTALL) -Dm644 usr/share/applications/argvus-system-monitor.desktop \
+	$(INSTALL) -Dm644 src/usr/share/applications/argvus-system-monitor.desktop \
 		"$(DESTDIR)$(PREFIX)/share/applications/argvus-system-monitor.desktop"
 	$(INSTALL) -dm755 "$(DESTDIR)$(PREFIX)/share/argvus-system-monitor"
-	cp -R --no-preserve=ownership usr/share/argvus-system-monitor/. "$(DESTDIR)$(PREFIX)/share/argvus-system-monitor/"
+	cp -R --no-preserve=ownership src/usr/share/argvus-system-monitor/. "$(DESTDIR)$(PREFIX)/share/argvus-system-monitor/"
 	$(INSTALL) -Dm644 LICENSE \
 		"$(DESTDIR)$(PREFIX)/share/licenses/argvus-system-monitor/LICENSE"
 
@@ -32,22 +32,22 @@ uninstall:
 
 validate:
 	@set -eu; \
-	test -x usr/bin/argvus-system-monitor; \
-	test -f usr/share/applications/argvus-system-monitor.desktop; \
-	test -f usr/share/argvus-system-monitor/btop/btop.conf; \
-	for theme in usr/share/argvus-system-monitor/btop/themes/*.theme; do test -f "$$theme"; done; \
-	sh -n usr/bin/argvus-system-monitor; \
+	test -x src/usr/bin/argvus-system-monitor; \
+	test -f src/usr/share/applications/argvus-system-monitor.desktop; \
+	test -f src/usr/share/argvus-system-monitor/btop/btop.conf; \
+	for theme in src/usr/share/argvus-system-monitor/btop/themes/*.theme; do test -f "$$theme"; done; \
+	sh -n src/usr/bin/argvus-system-monitor; \
 	if command -v shellcheck >/dev/null 2>&1; then \
-		shellcheck -e SC1090 -e SC1091 usr/bin/argvus-system-monitor; \
+		shellcheck -e SC1090 -e SC1091 src/usr/bin/argvus-system-monitor; \
 	else \
 		echo "shellcheck not found; skipped"; \
 	fi; \
 	if command -v desktop-file-validate >/dev/null 2>&1; then \
-		desktop-file-validate usr/share/applications/argvus-system-monitor.desktop; \
+		desktop-file-validate src/usr/share/applications/argvus-system-monitor.desktop; \
 	else \
 		echo "desktop-file-validate not found; skipped"; \
 	fi; \
-	! find usr -path '*/bin/btop' -o -path '*/applications/btop.desktop' | grep -q .
+	! find src/usr -path '*/bin/btop' -o -path '*/applications/btop.desktop' | grep -q .
 	@echo "argvus-system-monitor validation ok"
 
 build:

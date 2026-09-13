@@ -1,7 +1,6 @@
 /tmp
 /dist/
 /pkg/
-/src/
 /*.pkg.tar*
 /packaging/arch/pkg/
 /packaging/arch/src/
