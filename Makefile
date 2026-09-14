@@ -19,23 +19,23 @@ install:
 		"$(DESTDIR)$(PREFIX)/bin/argvus-system-monitor"
 	$(INSTALL) -Dm644 src/usr/share/applications/argvus-system-monitor.desktop \
 		"$(DESTDIR)$(PREFIX)/share/applications/argvus-system-monitor.desktop"
-	$(INSTALL) -dm755 "$(DESTDIR)$(PREFIX)/share/argvus-system-monitor"
-	cp -R --no-preserve=ownership src/usr/share/argvus-system-monitor/. "$(DESTDIR)$(PREFIX)/share/argvus-system-monitor/"
+	$(INSTALL) -dm755 "$(DESTDIR)$(PREFIX)/share/argvus/system-monitor"
+	cp -R --no-preserve=ownership src/usr/share/argvus/system-monitor/. "$(DESTDIR)$(PREFIX)/share/argvus/system-monitor/"
 	$(INSTALL) -Dm644 LICENSE \
 		"$(DESTDIR)$(PREFIX)/share/licenses/argvus-system-monitor/LICENSE"
 
 uninstall:
 	$(RM) "$(DESTDIR)$(PREFIX)/bin/argvus-system-monitor"
 	$(RM) "$(DESTDIR)$(PREFIX)/share/applications/argvus-system-monitor.desktop"
-	rm -rf "$(DESTDIR)$(PREFIX)/share/argvus-system-monitor"
+	rm -rf "$(DESTDIR)$(PREFIX)/share/argvus/system-monitor"
 	$(RM) "$(DESTDIR)$(PREFIX)/share/licenses/argvus-system-monitor/LICENSE"
 
 validate:
 	@set -eu; \
 	test -x src/usr/bin/argvus-system-monitor; \
 	test -f src/usr/share/applications/argvus-system-monitor.desktop; \
-	test -f src/usr/share/argvus-system-monitor/btop/btop.conf; \
-	for theme in src/usr/share/argvus-system-monitor/btop/themes/*.theme; do test -f "$$theme"; done; \
+	test -f src/usr/share/argvus/system-monitor/config/btop/btop.conf; \
+	for theme in src/usr/share/argvus/system-monitor/config/btop/themes/*.theme; do test -f "$$theme"; done; \
 	sh -n src/usr/bin/argvus-system-monitor; \
 	if command -v shellcheck >/dev/null 2>&1; then \
 		shellcheck -e SC1090 -e SC1091 src/usr/bin/argvus-system-monitor; \

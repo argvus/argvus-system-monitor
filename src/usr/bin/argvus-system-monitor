@@ -5,7 +5,7 @@ set -eu
 
 : "${HOME:?HOME is not set}"
 
-SYSTEM_ROOT="${ARGVUS_SYSTEM_MONITOR_CONFIG:-/usr/share/argvus-system-monitor}"
+SYSTEM_ROOT="${ARGVUS_SYSTEM_MONITOR_CONFIG:-/usr/share/argvus/system-monitor/config}"
 CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 ARGVUS_DIR="${ARGVUS_CONFIG_DIR:-$HOME/.config/argvus}"
 ACTIVE_THEME_FILE="${ARGVUS_ACTIVE_THEME_FILE:-$ARGVUS_DIR/.active-theme}"
