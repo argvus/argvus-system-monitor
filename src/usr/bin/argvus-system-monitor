@@ -15,6 +15,7 @@ BTOP_CONFIG="${BTOP_ROOT}/btop.conf"
 BTOP_THEMES_DIR="${BTOP_ROOT}/themes"
 RUNTIME_DIR="${CACHE_HOME}/argvus/argvus-system-monitor"
 RUNTIME_CONFIG="${RUNTIME_DIR}/btop.conf"
+RUNTIME_THEMES_DIR="${RUNTIME_DIR}/themes"
 
 usage() {
   cat <<'USAGE'
@@ -63,6 +64,72 @@ read_active_theme() {
   printf '%s\n' "$_theme"
 }
 
+read_accent() {
+  _accent=""
+  if [ -r "${ARGVUS_DIR}/.accent-color" ]; then
+    _accent="$(sed -n '1{s/^[[:space:]]*//;s/[[:space:]]*$//;p;}' "${ARGVUS_DIR}/.accent-color")"
+  fi
+  case "$_accent" in
+    \#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f])
+      printf '%s\n' "$_accent" | tr 'a-f' 'A-F'
+      ;;
+    *) printf '%s\n' "" ;;
+  esac
+}
+
+accent_foreground() {
+  _hex="${1#\#}"
+  _r="$(printf '%d' "0x${_hex%????}")"
+  _tail="${_hex#??}"
+  _g="$(printf '%d' "0x${_tail%??}")"
+  _b="$(printf '%d' "0x${_hex#????}")"
+  _luminance=$(( (299 * _r + 587 * _g + 114 * _b) / 1000 ))
+  [ "$_luminance" -ge 128 ] && printf '#000000\n' || printf '#FFFFFF\n'
+}
+
+build_runtime_theme() {
+  _theme="$1"
+  _source="${BTOP_THEMES_DIR}/${_theme}.theme"
+  _target="${RUNTIME_THEMES_DIR}/${_theme}.theme"
+  [ -f "$_source" ] || die "btop theme not found: $_source"
+  mkdir -p "$RUNTIME_THEMES_DIR"
+  _accent="$(read_accent)"
+  if [ -z "$_accent" ]; then
+    cp "$_source" "$_target"
+    return 0
+  fi
+  _foreground="$(accent_foreground "$_accent")"
+  awk -v accent="$_accent" -v foreground="$_foreground" '
+    BEGIN {
+      accent_keys["title"] = 1
+      accent_keys["hi_fg"] = 1
+      accent_keys["proc_misc"] = 1
+      accent_keys["cpu_box"] = 1
+      accent_keys["mem_box"] = 1
+      accent_keys["net_box"] = 1
+      accent_keys["proc_box"] = 1
+      accent_keys["temp_start"] = 1
+      accent_keys["cpu_mid"] = 1
+      accent_keys["free_mid"] = 1
+      accent_keys["available_mid"] = 1
+      accent_keys["download_mid"] = 1
+      accent_keys["upload_mid"] = 1
+      accent_keys["process_mid"] = 1
+    }
+    {
+      k = $0
+      sub(/^theme\[/, "", k)
+      sub(/\].*$/, "", k)
+      if (k == "selected_fg") {
+        sub(/="[^"]*"/, "=\"" foreground "\"")
+      } else if (accent_keys[k]) {
+        sub(/="[^"]*"/, "=\"" accent "\"")
+      }
+      print
+    }
+  ' "$_source" > "$_target"
+}
+
 build_runtime_config() {
   _theme="$1"
   _shown_boxes="$2"
@@ -71,6 +138,7 @@ build_runtime_config() {
   [ -d "$BTOP_THEMES_DIR" ] || die "btop themes directory not found: $BTOP_THEMES_DIR"
 
   mkdir -p "$RUNTIME_DIR"
+  build_runtime_theme "$_theme"
 
   sed \
     -e "s|^[[:space:]]*color_theme[[:space:]]*=.*|color_theme = \"${_theme}\"|" \
@@ -137,6 +205,12 @@ case "${1:-}" in
     printf '%s\n' "$RUNTIME_CONFIG"
     exit 0
     ;;
+
+  --apply)
+    _theme="${2:-$(read_active_theme)}"
+    build_runtime_theme "$_theme"
+    exit 0
+    ;;
 esac
 
 # Always launch the graphical/system-monitor invocation inside Foot.
@@ -157,5 +231,5 @@ build_runtime_config "$ACTIVE_THEME" "$SHOWN_BOXES"
 
 btop \
 --config "$RUNTIME_CONFIG" \
---themes-dir "$BTOP_THEMES_DIR" \
+--themes-dir "$RUNTIME_THEMES_DIR" \
 "$@"
