@@ -41,7 +41,7 @@ arch_package_system_monitor_payload() {
 	local source_root="${srcdir}/${pkgname}-${pkgver}"
 
 	install -Dm755 "${source_root}/src/usr/bin/argvus-system-monitor" \
-		"${pkgdir}/usr/bin/argvus-system-monitor"
+		"${pkgdir}/usr/lib/argvus/commands/argvus-system-monitor"
 	install -Dm644 "${source_root}/src/usr/share/applications/argvus-system-monitor.desktop" \
 		"${pkgdir}/usr/share/applications/argvus-system-monitor.desktop"
 	install -d "${pkgdir}/usr/share/argvus-system-monitor/btop/themes"

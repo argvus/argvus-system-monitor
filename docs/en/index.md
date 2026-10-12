@@ -9,7 +9,7 @@ Open the configured monitor with:
 argvus --system-monitor
 ```
 
-The `argvus-system-monitor` package provides the native entry point and btop integration. Telemetry shown in the taskbar is a separate feature provided by `argvus-widget-telemetry`.
+The `argvus system-monitor` package provides the native entry point and btop integration. Telemetry shown in the taskbar is a separate feature provided by `argvus-widget-telemetry`.
 
 The monitor reads the selected theme and accent from
 `$XDG_CONFIG_HOME/argvus/config.json` first. Its generated btop files remain
